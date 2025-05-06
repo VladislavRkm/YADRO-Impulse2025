@@ -1,0 +1,72 @@
+- name: Развертывание Docker на localhost
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Обновление списка пакетов
+      become: true
+      apt:
+        update_cache: yes
+
+    - name: Установка Docker
+      become: true
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Добавление пользователя в группу docker
+      user:
+        name: "{{ ansible_env.USER }}"
+        groups: docker
+        append: true
+
+    - name: Запуск и включение Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Ожидание запуска Docker
+      wait_for:
+        timeout: 10
+
+    - name: Проверка успешности установки Docker
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Вывод версии Docker
+      debug:
+        msg: "Установлена версия Docker: {{ docker_version.stdout }}"
+
+    - name: Копирование файлов на localhost
+      copy:
+        src: "{{ item }}"
+        dest: "/home/{{ ansible_env.USER }}/{{ item }}"
+      loop:
+        - Dockerfile
+        - http_requests_processing.py
+
+    - name: Сборка Docker-образа
+      community.docker.docker_image:
+        name: my_http_processing_script
+        build:
+          path: "/home/{{ ansible_env.USER }}/"
+        source: build
+      register: build_output
+
+    - name: Запуск контейнера
+      community.docker.docker_container:
+        name: http_script_container
+        image: my_http_processing_script
+        state: started
+        detach: true
+
+    - name: Проверка запущенных контейнеров
+      community.docker.docker_container_info:
+        name: http_script_container
+      register: container_info
+
+    - name: Вывод состояния контейнера
+      debug:
+        msg: "{{ container_info }}"
+
