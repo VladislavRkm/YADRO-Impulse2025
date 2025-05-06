@@ -1,0 +1,6 @@
+name: test_server
+path: /home/user/data
+file: data.txt
+port: 8080
+log_path: /var/log/app
+
